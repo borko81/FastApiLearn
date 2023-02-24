@@ -1,7 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+
 from pydantic import BaseModel, Field
 from uuid import UUID
 from typing import Optional, List
+
+
+from custom_exceptions.not_found_exception import raise_not_found_exception
 
 app = FastAPI()
 
@@ -14,6 +18,16 @@ class BookReturn(BaseModel):
 class Book(BookReturn):
     id: UUID
     description: Optional[str] = Field(max_length=100)
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "id": "1367e493-5030-4a22-9f1d-c50638b4c04b",
+                "name": "Borko",
+                "description": "Book description",
+                "price": 99.00,
+            }
+        }
 
 
 BOOKS = []
@@ -59,9 +73,12 @@ async def check_is_work():
 
 
 @app.get("/books", response_model=List[BookReturn])
-async def return_all_books() -> List[BookReturn]:
+async def return_all_books(l: Optional[int] = None) -> List[BookReturn]:
     if len(BOOKS) == 0:
         temporary_added_book_to_books()
+
+    if l and l < len(BOOKS):
+        return BOOKS[:l]
     return BOOKS
 
 
@@ -72,10 +89,28 @@ async def retrurn_book_by_id(name: str):
     try:
         return book[0]
     except IndexError:
-        return {"message": "Error"}
+        raise_not_found_exception()
 
 
 @app.post("/add_new_book", status_code=201)
 async def add_new_book(book: Book):
     BOOKS.append(book)
     return {"message": "Write successfully"}
+
+
+@app.put("/book/{id_}", status_code=201)
+async def change_book(id_: UUID, book: Book) -> dict:
+    for pos, line in enumerate(BOOKS):
+        if line.id == id_:
+            BOOKS[pos] = book
+            return BOOKS[pos]
+    raise_not_found_exception()
+
+
+@app.delete("/book/{id_}", status_code=204)
+async def remove_book(id_: UUID):
+    for pos, line in enumerate(BOOKS):
+        if line.id == id_:
+            del BOOKS[pos]
+            return 204
+    raise_not_found_exception()
