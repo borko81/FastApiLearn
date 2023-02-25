@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 
 from pydantic import BaseModel, Field
 from uuid import UUID
 from typing import Optional, List
+from enum import Enum
 
 
 from custom_exceptions.not_found_exception import raise_not_found_exception
@@ -30,6 +31,19 @@ class Book(BookReturn):
         }
 
 
+class SortedBooks(str, Enum):
+    Name = "name"
+    Price = "price"
+
+
+def custom_sorted(shelf):
+    custom_sorted = {
+        "name": shelf.sort(key=lambda x: x.name),
+        "price": shelf.sort(key=lambda x: x.price),
+    }
+    return custom_sorted
+
+
 BOOKS = []
 
 
@@ -38,7 +52,7 @@ def temporary_added_book_to_books():
         id="7367e493-5030-4a22-9f1d-c50638b4c04b",
         name="Book One",
         description="Description for first book",
-        price=10.11,
+        price=50.11,
     )
 
     book_2 = Book(
@@ -73,19 +87,31 @@ async def check_is_work():
 
 
 @app.get("/books", response_model=List[BookReturn])
-async def return_all_books(l: Optional[int] = None) -> List[BookReturn]:
+async def return_all_books(
+    l: Optional[int] = None,
+    sorted: Optional[SortedBooks] = None,
+    check_header: Optional[str] = Header(None),
+) -> List[BookReturn]:
+    if not check_header == "Borko":
+        raise HTTPException(status_code=400)
     if len(BOOKS) == 0:
         temporary_added_book_to_books()
 
+    TEMPORARY_BOOKS = BOOKS.copy()
+
+    if sorted:
+        print(sorted)
+        custom_sorted(TEMPORARY_BOOKS)[sorted.value]
+
     if l and l < len(BOOKS):
-        return BOOKS[:l]
-    return BOOKS
+        return TEMPORARY_BOOKS[:l]
+
+    return TEMPORARY_BOOKS
 
 
 @app.get("/book/{name}", status_code=200)
 async def retrurn_book_by_id(name: str):
     book = [b for b in BOOKS if b.name.lower() == name.lower()]
-    print(book)
     try:
         return book[0]
     except IndexError:
