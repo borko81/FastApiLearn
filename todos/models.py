@@ -9,4 +9,4 @@ class Todo(Base):
     title = Column(String)
     description = Column(String)
     priority = Column(Integer)
-    completed = Column(Boolean, default=False)
+    completed = Column(Integer, default=0)
